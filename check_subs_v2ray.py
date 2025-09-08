@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-import asyncio, json, tempfile, os, base64, argparse, re
+import asyncio, json, tempfile, os, base64
 from urllib.parse import urlparse, unquote, parse_qs
-import aiohttp
+import aiohttp, csv
+
+SUB_URL = "https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/Sub8.txt"
 
 def safe_b64decode(s):
     s2 = s.strip()
@@ -9,17 +11,15 @@ def safe_b64decode(s):
     return base64.urlsafe_b64decode(s2 + "="*pad)
 
 def extract_entries(sub_content: str):
-    """Decode sub URL response menjadi list vmess:// vless:// trojan://"""
     try:
         decoded = safe_b64decode(sub_content).decode("utf-8", errors="ignore")
-        if "vmess://" in decoded or "vless://" in decoded or "trojan://" in decoded:
+        if any(proto in decoded for proto in ["vmess://", "vless://", "trojan://"]):
             return [x.strip() for x in decoded.splitlines() if x.strip()]
     except Exception:
         pass
     return [x.strip() for x in sub_content.splitlines() if x.strip()]
 
 def parse_entry(uri):
-    """Parse vmess/vless/trojan uri ke dict sederhana"""
     if uri.startswith("vmess://"):
         raw = uri[8:]
         data = json.loads(safe_b64decode(raw).decode())
@@ -28,24 +28,24 @@ def parse_entry(uri):
             "server": data["add"],
             "port": int(data["port"]),
             "id": data["id"],
-            "security": data.get("scy", "auto"),
             "alterId": int(data.get("aid", 0)),
-            "remark": data.get("ps", "")
+            "security": data.get("scy", "auto"),
+            "remark": data.get("ps", ""),
+            "uri": uri
         }
     else:
         u = urlparse(uri)
-        qs = parse_qs(u.query)
         return {
             "protocol": u.scheme,
             "server": u.hostname,
             "port": u.port,
-            "id": u.username,   # untuk vless biasanya UUID
+            "id": u.username,
             "password": u.password,
-            "remark": unquote(u.fragment) if u.fragment else ""
+            "remark": unquote(u.fragment) if u.fragment else "",
+            "uri": uri
         }
 
 def build_config(entry):
-    """Bangun config.json sesuai protokol"""
     if entry["protocol"] == "vmess":
         return {
             "log": {"loglevel": "warning"},
@@ -98,8 +98,7 @@ def build_config(entry):
                 }
             }]
         }
-    else:
-        return None
+    return None
 
 async def test_entry(entry, v2ray_bin, timeout=8):
     cfg = build_config(entry)
@@ -124,17 +123,16 @@ async def test_entry(entry, v2ray_bin, timeout=8):
     finally:
         os.remove(fname)
 
-async def main(args):
+async def main():
     async with aiohttp.ClientSession() as sess:
-        async with sess.get(args.suburl, timeout=15) as r:
+        async with sess.get(SUB_URL, timeout=15) as r:
             content = await r.text()
     entries_raw = extract_entries(content)
-    print(f"Fetched {len(entries_raw)} entries from {args.suburl}")
     parsed = [parse_entry(e) for e in entries_raw]
 
     results = []
     for p in parsed:
-        ok = await test_entry(p, args.v2ray, timeout=args.timeout)
+        ok = await test_entry(p, "./v2ray/v2ray", timeout=8)
         results.append({
             "protocol": p["protocol"],
             "server": p["server"],
@@ -142,12 +140,23 @@ async def main(args):
             "remark": p.get("remark", ""),
             "status": "active" if ok else "inactive"
         })
-    print(json.dumps(results, indent=2))
+
+    # JSON
+    with open("results.json", "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+
+    # CSV
+    with open("results.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["protocol","server","port","remark","status"])
+        w.writeheader()
+        for r in results:
+            w.writerow(r)
+
+    # TXT (hanya link aktif)
+    with open("results.txt", "w", encoding="utf-8") as f:
+        for r, p in zip(results, parsed):
+            if r["status"] == "active":
+                f.write(p["uri"] + "\n")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--suburl", required=True, help="Subscription URL")
-    parser.add_argument("--v2ray", default="./v2ray", help="Path ke binary v2ray")
-    parser.add_argument("--timeout", type=int, default=8)
-    args = parser.parse_args()
-    asyncio.run(main(args))
+    asyncio.run(main())
