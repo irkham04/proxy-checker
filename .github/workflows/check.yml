@@ -29,11 +29,16 @@ jobs:
       - name: Run checker
         run: python3 check_subs_v2ray.py
 
+      # 🔎 Debugging: cek file hasil
+      - name: Debug list files
+        run: ls -lah
+
+      - name: Debug show results
+        run: cat results.txt || echo "results.txt not found"
+
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
           name: proxy-check-results
-          path: |
-            results.json
-            results.csv
-            results.txt
+          path: results.txt
+          if-no-files-found: warn
