@@ -3,7 +3,7 @@ import asyncio, json, tempfile, os, base64
 from urllib.parse import urlparse, unquote
 import aiohttp
 
-SUB_URL = "https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/Sub8.txt"
+SUB_URL = "https://young-dew.hunzua.workers.dev/vpn/v2ray?type=vless&bug=quiz.vidio.com&tls=true&wildcard=false&limit=5&country=ID"
 
 def safe_b64decode(s):
     s2 = s.strip()
