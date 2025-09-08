@@ -1,9 +1,9 @@
 name: check-proxies-v2ray
 
 on:
-  workflow_dispatch:   # jalan manual dari menu Actions
+  workflow_dispatch:
   schedule:
-    - cron: "0 */6 * * *"   # jalan tiap 6 jam (opsional)
+    - cron: "0 */6 * * *"
 
 jobs:
   check:
@@ -30,11 +30,12 @@ jobs:
         run: |
           python3 check_subs_v2ray.py \
             --suburl "https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/Sub8.txt" \
-            --v2ray ./v2ray/v2ray \
-            > results.json
+            --v2ray ./v2ray/v2ray
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
           name: proxy-check-results
-          path: results.json
+          path: |
+            results.json
+            results.csv
