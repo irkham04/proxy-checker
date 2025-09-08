@@ -1,0 +1,40 @@
+name: check-proxies-v2ray
+
+on:
+  workflow_dispatch:   # jalan manual dari menu Actions
+  schedule:
+    - cron: "0 */6 * * *"   # jalan tiap 6 jam (opsional)
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download v2ray-core
+        run: |
+          curl -L https://github.com/v2fly/v2ray-core/releases/latest/download/v2ray-linux-64.zip -o v2ray.zip
+          sudo apt-get install unzip -y
+          unzip v2ray.zip -d v2ray
+          chmod +x v2ray/v2ray
+
+      - name: Run checker
+        run: |
+          python3 check_subs_v2ray.py \
+            --suburl "https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/Sub8.txt" \
+            --v2ray ./v2ray/v2ray \
+            > results.json
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: proxy-check-results
+          path: results.json
