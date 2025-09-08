@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import asyncio, json, tempfile, os, base64
-from urllib.parse import urlparse, unquote, parse_qs
-import aiohttp, csv
+from urllib.parse import urlparse, unquote
+import aiohttp
 
 SUB_URL = "https://raw.githubusercontent.com/Epodonios/v2ray-configs/refs/heads/main/Sub8.txt"
 
@@ -109,7 +109,7 @@ async def test_entry(entry, v2ray_bin, timeout=8):
         fname = f.name
     try:
         proc = await asyncio.create_subprocess_exec(
-            v2ray_bin, "run", "-c", fname,
+            v2ray_bin, "-c", fname,   # FIX: tidak pakai "run"
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT
         )
@@ -130,32 +130,11 @@ async def main():
     entries_raw = extract_entries(content)
     parsed = [parse_entry(e) for e in entries_raw]
 
-    results = []
-    for p in parsed:
-        ok = await test_entry(p, "./v2ray/v2ray", timeout=8)
-        results.append({
-            "protocol": p["protocol"],
-            "server": p["server"],
-            "port": p["port"],
-            "remark": p.get("remark", ""),
-            "status": "active" if ok else "inactive"
-        })
-
-    # JSON
-    with open("results.json", "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
-
-    # CSV
-    with open("results.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["protocol","server","port","remark","status"])
-        w.writeheader()
-        for r in results:
-            w.writerow(r)
-
-    # TXT (hanya link aktif)
+    # hasil akhir hanya link aktif
     with open("results.txt", "w", encoding="utf-8") as f:
-        for r, p in zip(results, parsed):
-            if r["status"] == "active":
+        for p in parsed:
+            ok = await test_entry(p, "./v2ray/v2ray", timeout=8)
+            if ok:
                 f.write(p["uri"] + "\n")
 
 if __name__ == "__main__":
